@@ -202,7 +202,7 @@ int funnel_stream_egl_add_format(struct funnel_stream *stream,
 
 int funnel_buffer_get_egl_image(struct funnel_buffer *buf, EGLImage *image) {
     *image = NULL;
-    if (buf->stream->api != API_EGL)
+    if (!buf || buf->stream->api != API_EGL)
         return -EINVAL;
 
     *image = buf->api_buf;

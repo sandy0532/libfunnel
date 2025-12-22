@@ -2,10 +2,15 @@
 #include <funnel.h>
 
 #include <GLES2/gl2.h>
+#include <asm-generic/errno-base.h>
+#include <asm-generic/errno.h>
 #include <assert.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include <X11/Xlib.h>
@@ -47,9 +52,9 @@ static void initialize_egl(Display *x11_display, Window x11_window,
     // get an appropriate EGL frame buffer configuration
     EGLConfig config;
     EGLint num_config;
-    EGLint const attribute_list_config[] = {
-        EGL_RED_SIZE,  8, EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE};
+    EGLint const attribute_list_config[] = {EGL_RED_SIZE,  8, EGL_GREEN_SIZE, 8,
+                                            EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
+                                            EGL_NONE};
     eglChooseConfig(display, attribute_list_config, &config, 1, &num_config);
 
     // create an EGL rendering context
@@ -85,14 +90,16 @@ void gl_setup_scene(void) {
 
         "void main()\n"
         "{\n"
-        "   float a = frame * 0.1;"
+        "   float a = frame * 3.141592 / 4.;"
         "   mat4 rot = mat4(cos(a), -sin(a), 0., 0.,\n"
         "                   sin(a),  cos(a), 0., 0., \n"
         "                       0.,      0., 1., 0., \n"
         "                       0.,      0., 0., 1.);\n"
         "   TexCoords = aTexCoords;\n"
-        "   gl_Position = rot * vec4(aPos.x * 0.5, aPos.y * 0.5, aPos.z * 0.5, "
-        "1.0);\n"
+        "   vec4 pos = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+        "   pos = vec4(0.1,0.1,0.1,1.0) * pos;\n"
+        "   pos += vec4(0.5,0.5,0.0,0.0);\n"
+        "   gl_Position = rot * pos;\n"
         "}\0";
     const char *fragment_shader_source =
         "#version 330 core\n"
@@ -223,6 +230,19 @@ int do_init(uint32_t width, uint32_t height) {
     return 0;
 }
 
+double timef(void) {
+    double val;
+    static double base = 0;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    val = tv.tv_sec + (double)tv.tv_usec / 1000000.f;
+    if (!base)
+        base = val;
+
+    return val - base;
+}
+
 int main(int argc, char **argv) {
     int ret;
     struct funnel_ctx *ctx;
@@ -230,7 +250,20 @@ int main(int argc, char **argv) {
     uint32_t width = 512;
     uint32_t height = 512;
 
+    enum funnel_mode mode = FUNNEL_ASYNC;
+
+    if (argc > 1 && !strcmp(argv[1], "-async"))
+        mode = FUNNEL_ASYNC;
+    if (argc > 1 && !strcmp(argv[1], "-single"))
+        mode = FUNNEL_SINGLE_BUFFERED;
+    if (argc > 1 && !strcmp(argv[1], "-double"))
+        mode = FUNNEL_DOUBLE_BUFFERED;
+    if (argc > 1 && !strcmp(argv[1], "-sync"))
+        mode = FUNNEL_SYNC;
+
     do_init(width, height);
+
+    eglSwapInterval(egl_display, mode == FUNNEL_ASYNC ? 1 : 0);
 
     ret = funnel_init(&ctx);
     assert(ret == 0);
@@ -244,11 +277,12 @@ int main(int argc, char **argv) {
     ret = funnel_stream_set_size(stream, width, height);
     assert(ret == 0);
 
-    ret = funnel_stream_set_buffers(stream, 3, 2, 4);
+    ret = funnel_stream_set_mode(stream, mode);
     assert(ret == 0);
 
-    ret = funnel_stream_set_rate(stream, FUNNEL_RATE_VARIABLE,
-                                 FUNNEL_RATE_VARIABLE, FUNNEL_RATE_VARIABLE);
+    ret =
+        funnel_stream_set_rate(stream, FUNNEL_RATE_VARIABLE,
+                               FUNNEL_FRACTION(1, 1), FUNNEL_FRACTION(1000, 1));
     assert(ret == 0);
 
     ret = funnel_stream_egl_add_format(stream, FUNNEL_EGL_FORMAT_RGBA8888);
@@ -263,47 +297,59 @@ int main(int argc, char **argv) {
     glGenFramebuffers(1, &fb);
 
     while (1) {
-        gl_draw_triangle();
 
         assert(glGetError() == GL_NO_ERROR);
 
         struct funnel_buffer *buf;
 
         ret = funnel_stream_dequeue(stream, &buf);
+        float t = timef();
         assert(ret == 0);
         if (!buf) {
-            fprintf(stderr, "No buffers\n");
-            goto no_buffers;
+            fprintf(stderr, "[%f] No buffers\n", t);
+        } else {
+            fprintf(stderr, "[%f] Got buffer\n", t);
         }
 
-        EGLImage image;
+        gl_draw_triangle();
 
-        ret = funnel_buffer_get_egl_image(buf, &image);
-        assert(ret == 0);
+        if (buf) {
+            EGLImage image;
 
-        GLuint color_tex;
-        glGenTextures(1, &color_tex);
-        glBindTexture(GL_TEXTURE_2D, color_tex);
-        glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
+            ret = funnel_buffer_get_egl_image(buf, &image);
+            assert(ret == 0);
 
-        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, fb);
-        glFramebufferTexture2DEXT(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0_EXT,
-                                  GL_TEXTURE_2D, color_tex, 0);
+            GLuint color_tex;
+            glGenTextures(1, &color_tex);
+            glBindTexture(GL_TEXTURE_2D, color_tex);
+            glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
 
-        glBlitFramebuffer(0, height, width, 0, 0, 0, width, height,
-                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, fb);
+            glFramebufferTexture2DEXT(GL_DRAW_FRAMEBUFFER,
+                                      GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D,
+                                      color_tex, 0);
 
-        glFramebufferTexture2DEXT(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0_EXT,
-                                  GL_TEXTURE_2D, 0, 0);
-        glDeleteTextures(1, &color_tex);
-        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+            glBlitFramebuffer(0, height, width, 0, 0, 0, width, height,
+                              GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-        glFlush();
-        ret = funnel_stream_enqueue(stream, buf);
-        assert(ret == 0);
+            glFramebufferTexture2DEXT(GL_DRAW_FRAMEBUFFER,
+                                      GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D,
+                                      0, 0);
+            glDeleteTextures(1, &color_tex);
+            glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
 
-    no_buffers:
+            glFlush();
+        }
+
         eglSwapBuffers(egl_display, egl_surface);
+
+        if (buf) {
+            ret = funnel_stream_enqueue(stream, buf);
+            if (ret < 0) {
+                fprintf(stderr, "Queue failed: %d\n", ret);
+            }
+            assert(ret == 0 || ret == -ESTALE);
+        }
     }
 
     ret = funnel_stream_stop(stream);

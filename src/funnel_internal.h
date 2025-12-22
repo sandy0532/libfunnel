@@ -34,6 +34,8 @@ struct funnel_format {
 };
 
 struct funnel_stream_config {
+    enum funnel_mode mode;
+
     struct {
         int def, min, max;
     } buffers;
@@ -60,6 +62,12 @@ struct funnel_stream_funcs {
     void (*free_buffer)(struct funnel_buffer *);
 };
 
+enum funnel_sync_cycle {
+    SYNC_CYCLE_INACTIVE,
+    SYNC_CYCLE_WAITING,
+    SYNC_CYCLE_ACTIVE,
+};
+
 struct funnel_stream {
     struct funnel_ctx *ctx;
     const char *name;
@@ -79,11 +87,18 @@ struct funnel_stream {
     uint32_t cur_format;
     uint64_t cur_modifier;
 
+    bool active;
+    int num_buffers;
+    enum funnel_sync_cycle cycle_state;
+    int buffers_dequeued;
+    struct funnel_buffer *pending_buffer;
+
     struct {
         struct funnel_stream_config config;
         bool ready;
         struct spa_video_info_raw video_format;
 
+        struct funnel_fraction rate;
         uint32_t plane_count;
         uint32_t width;
         uint32_t height;
@@ -98,6 +113,7 @@ struct funnel_buffer {
     struct funnel_stream *stream;
     struct pw_buffer *pw_buffer;
     bool dequeued;
+    bool driving;
     struct gbm_bo *bo;
     int fds[6];
     void *api_buf;
