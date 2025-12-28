@@ -3,6 +3,7 @@
 #include <funnel-vk.h>
 #include <funnel.h>
 
+#include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <asm/errno.h>
 #include <assert.h>
@@ -81,6 +82,8 @@ static struct wl_surface *surface = NULL;
 static struct xdg_wm_base *shell = NULL;
 static struct xdg_surface *shellSurface = NULL;
 static struct xdg_toplevel *toplevel = NULL;
+static struct zxdg_decoration_manager_v1 *decoration_manager = NULL;
+static struct zxdg_toplevel_decoration_v1 *decoration;
 static int quit = 0;
 static int readyToResize = 0;
 static int resize = 0;
@@ -185,6 +188,10 @@ static void handleRegistry(void *data, struct wl_registry *registry,
     if (strcmp(interface, wl_compositor_interface.name) == 0) {
         CHECK_WL_RESULT(compositor = wl_registry_bind(
                             registry, name, &wl_compositor_interface, 1));
+    } else if (strcmp(interface, zxdg_decoration_manager_v1_interface.name) ==
+               0) {
+        decoration_manager = wl_registry_bind(
+            registry, name, &zxdg_decoration_manager_v1_interface, 1);
     } else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
         CHECK_WL_RESULT(shell = wl_registry_bind(registry, name,
                                                  &xdg_wm_base_interface, 1));
@@ -234,6 +241,7 @@ onError(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 
 void alloc_buffer_cb(void *opaque, struct funnel_stream *stream,
                      struct funnel_buffer *buf) {
+    /*
     VkImage image;
     VkResult result;
     int ret = funnel_buffer_get_vk_image(buf, &image);
@@ -245,7 +253,6 @@ void alloc_buffer_cb(void *opaque, struct funnel_stream *stream,
     assert(ret == 0);
     assert(format != VK_FORMAT_UNDEFINED);
 
-    /*
     VkImageView view;
     VkImageViewCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -625,8 +632,14 @@ int main(int argc, char **argv) {
     CHECK_WL_RESULT(toplevel = xdg_surface_get_toplevel(shellSurface));
     xdg_toplevel_add_listener(toplevel, &toplevelListener, NULL);
 
+    CHECK_WL_RESULT(decoration =
+                        zxdg_decoration_manager_v1_get_toplevel_decoration(
+                            decoration_manager, toplevel));
+
     xdg_toplevel_set_title(toplevel, appName);
     xdg_toplevel_set_app_id(toplevel, appName);
+    zxdg_toplevel_decoration_v1_set_mode(
+        decoration, ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 
     wl_surface_commit(surface);
     wl_display_roundtrip(display);
@@ -896,6 +909,7 @@ int main(int argc, char **argv) {
 
     while (!quit) {
         if (readyToResize && resize) {
+            bool changed = width != newWidth || height != newHeight;
             width = newWidth;
             height = newHeight;
 
@@ -911,6 +925,13 @@ int main(int argc, char **argv) {
             resize = 0;
 
             wl_surface_commit(surface);
+
+            if (changed) {
+                ret = funnel_stream_set_size(stream, width, height);
+                assert(ret == 0);
+                ret = funnel_stream_configure(stream);
+                assert(ret == 0);
+            }
         }
 
         struct funnel_buffer *buf;
@@ -977,6 +998,10 @@ int main(int argc, char **argv) {
             vkCmdDraw(element->commandBuffer, 3, 1, 0, 0);
             vkCmdEndRenderPass(element->commandBuffer);
             if (buf) {
+                uint32_t bwidth, bheight;
+
+                funnel_buffer_get_size(buf, &bwidth, &bheight);
+
                 VkImage image;
                 int ret = funnel_buffer_get_vk_image(buf, &image);
                 assert(ret == 0);
@@ -997,7 +1022,7 @@ int main(int argc, char **argv) {
                             .baseArrayLayer = 0,
                             .layerCount = 1,
                         },
-                    .dstOffsets = {{0, 0, 0}, {width, height, 1}},
+                    .dstOffsets = {{0, 0, 0}, {bwidth, bheight, 1}},
                 };
 
                 vkCmdBlitImage(element->commandBuffer, element->image,

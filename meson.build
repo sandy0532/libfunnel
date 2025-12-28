@@ -28,6 +28,13 @@ wl_mod = import('unstable-wayland')
 xml = wl_mod.find_protocol('xdg-shell')
 xdg_shell = wl_mod.scan_xml(xml)
 
+xml = wl_mod.find_protocol(
+  'xdg-decoration',
+  state : 'unstable',
+  version : 1,
+)
+xdg_decoration = wl_mod.scan_xml(xml)
+
 glsl_compiler = find_program('glslang', 'glslangValidator')
 glsl_args = [
   '--quiet',
@@ -49,6 +56,6 @@ demo_shaders = files([
   'shaders/triangle_vert.vert',
 ])
 
-executable('funnel-test-vk', 'test-vk.c', xdg_shell,
+executable('funnel-test-vk', 'test-vk.c', xdg_shell, xdg_decoration,
     glsl_generator.process(demo_shaders),
     dependencies: [wayland, funnel, funnel_vk, vulkan])
