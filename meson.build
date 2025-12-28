@@ -11,7 +11,7 @@ lib_funnel = library('funnel', 'src/funnel.c',
     include_directories : includes)
 funnel = declare_dependency(link_with : lib_funnel, include_directories : includes)
 
-lib_funnel_egl = library('funnel-egl', 'src/egl.c', dependencies: [funnel, pipewire, egl])
+lib_funnel_egl = library('funnel-egl', 'src/egl.c', dependencies: [funnel, pipewire, egl, gbm])
 lib_funnel_vk = library('funnel-vk', 'src/vulkan.c', dependencies: [funnel, pipewire])
 
 funnel_egl = declare_dependency(link_with : lib_funnel_egl, include_directories : includes)

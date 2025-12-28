@@ -195,6 +195,8 @@ int funnel_stream_egl_add_format(struct funnel_stream *stream,
         success |= try_format(stream, GBM_FORMAT_ABGR8888);
         success |= try_format(stream, GBM_FORMAT_BGRA8888);
         break;
+    default:
+        return -EINVAL;
     }
 
     return success ? 0 : -ENOTSUP;
@@ -206,5 +208,29 @@ int funnel_buffer_get_egl_image(struct funnel_buffer *buf, EGLImage *image) {
         return -EINVAL;
 
     *image = buf->api_buf;
+    return 0;
+}
+
+int funnel_buffer_get_egl_format(struct funnel_buffer *buf,
+                                 enum funnel_egl_format *format) {
+    *format = FUNNEL_EGL_FORMAT_UNKNOWN;
+
+    if (!buf || buf->stream->api != API_EGL)
+        return -EINVAL;
+
+    switch (gbm_bo_get_format(buf->bo)) {
+    case GBM_FORMAT_ARGB8888:
+    case GBM_FORMAT_RGBA8888:
+    case GBM_FORMAT_ABGR8888:
+    case GBM_FORMAT_BGRA8888:
+        *format = FUNNEL_EGL_FORMAT_RGBA8888;
+        break;
+    case GBM_FORMAT_XRGB8888:
+    case GBM_FORMAT_RGBX8888:
+    case GBM_FORMAT_XBGR8888:
+    case GBM_FORMAT_BGRX8888:
+        *format = FUNNEL_EGL_FORMAT_RGB888;
+        break;
+    }
     return 0;
 }

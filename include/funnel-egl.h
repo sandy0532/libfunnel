@@ -4,6 +4,7 @@
 #include <EGL/egl.h>
 
 enum funnel_egl_format {
+    FUNNEL_EGL_FORMAT_UNKNOWN = 0,
     FUNNEL_EGL_FORMAT_RGB888,
     FUNNEL_EGL_FORMAT_RGBA8888,
 };
