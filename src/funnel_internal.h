@@ -60,6 +60,7 @@ enum funnel_api {
 struct funnel_stream_funcs {
     void (*alloc_buffer)(struct funnel_buffer *);
     void (*free_buffer)(struct funnel_buffer *);
+    void (*destroy)(struct funnel_stream *);
 };
 
 enum funnel_sync_cycle {

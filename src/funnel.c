@@ -1037,6 +1037,9 @@ void funnel_stream_destroy(struct funnel_stream *stream) {
                                stream->timer);
     }
 
+    if (stream->funcs && stream->funcs->destroy)
+        stream->funcs->destroy(stream);
+
     pw_thread_loop_unlock(ctx->loop);
 
     free((void *)stream->name);
